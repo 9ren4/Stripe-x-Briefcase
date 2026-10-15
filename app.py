@@ -1,6 +1,7 @@
 import json
+import os
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_file
 
 import agent
 import memory
@@ -41,6 +42,14 @@ def reject(case_id):
 def ask():
     answer, recalled = agent.explain(request.json["question"])
     return jsonify(answer=answer, memory=recalled)
+
+
+@app.get("/memory")
+def memory_graph():
+    """Cognee's own visualisation of what the agent remembers."""
+    path = os.path.abspath("cognee_graph.html")
+    memory.render_graph(path)
+    return send_file(path)
 
 
 @app.errorhandler(Exception)

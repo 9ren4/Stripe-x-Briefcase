@@ -6,3 +6,4 @@ cases.json
 server.log
 .cognee_policy_*
 cognee_install.log
+cognee_graph.html

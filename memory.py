@@ -113,6 +113,12 @@ def customer_history(email):
                   f"List dates, amounts, orders and policy clauses. If none are known, say 'No prior history'.")
 
 
+def render_graph(path):
+    """Render this batch's Cognee knowledge graph to a self-contained HTML file."""
+    import cognee
+    return _submit(cognee.visualize_graph(path, dataset=dataset(), full=True)).result(timeout=120)
+
+
 def audit_log():
     from agent import load_cases
     return "\n".join(case_summary(c) for c in load_cases().values())

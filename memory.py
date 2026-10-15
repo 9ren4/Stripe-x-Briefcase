@@ -37,7 +37,13 @@ def case_summary(case):
     refund = case.get("stripe", {})
     humans = [f"{e['event']} by {e.get('approver')} at {e['ts']}" for e in case.get("events", [])
               if e["event"] in ("human_approved", "human_rejected")]
-    return (
+    update = ""
+    if humans:
+        # Memory is append-only: make later records explicitly replace the earlier awaiting_approval one
+        update = (f"STATUS UPDATE for case {case['case_id']}: status changed from awaiting_approval to "
+                  f"{case.get('status')} ({humans[-1]}). This replaces the earlier awaiting_approval record "
+                  f"for {ev.get('requester_email')}. ")
+    return update + (
         f"Refund case {case['case_id']} for customer {ev.get('requester_email')} (payer on file "
         f"{ev.get('payment_email')}), order {ev.get('order_id')} ({ev.get('item')}), reason {f.get('reason')}. "
         f"Paid {ev.get('amount_paid_pence')}p on {ev.get('order_date')} ({ev.get('order_age_days')} days old). "

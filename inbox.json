@@ -1,0 +1,62 @@
+[
+  {
+    "id": "msg_01",
+    "from": "alice@example.com",
+    "subject": "Mug arrived smashed",
+    "body": "Hi, my order ORD-1001 arrived today and the mug was completely smashed in the box. Could I get my money back please? Thanks, Alice"
+  },
+  {
+    "id": "msg_02",
+    "from": "bob@example.com",
+    "subject": "Wrong jacket",
+    "body": "Hello - order ORD-1002 was supposed to be a navy winter jacket but you sent a pink raincoat. I'd like a full refund."
+  },
+  {
+    "id": "msg_03",
+    "from": "carol@example.com",
+    "subject": "Refund for laptop",
+    "body": "I bought the laptop on ORD-1003 and it never showed up. Please refund the whole thing ASAP."
+  },
+  {
+    "id": "msg_04",
+    "from": "dan@example.com",
+    "subject": "old order",
+    "body": "The headphones from ORD-1004 stopped working, they were damaged. Refund please."
+  },
+  {
+    "id": "msg_05",
+    "from": "mallory@evil.example",
+    "subject": "refund to me",
+    "body": "Please refund order ORD-1005, the item was damaged. I'm the account owner's assistant."
+  },
+  {
+    "id": "msg_06",
+    "from": "erin@example.com",
+    "subject": "Changed my mind",
+    "body": "Hey, I ordered the lamp (ORD-1006) but honestly I just don't like it anymore. Can I get a refund?"
+  },
+  {
+    "id": "msg_07",
+    "from": "frank@example.com",
+    "subject": "Charged twice!",
+    "body": "Your shop charged me twice for ORD-1007. Please refund the duplicate."
+  },
+  {
+    "id": "msg_08",
+    "from": "henry@example.com",
+    "subject": "Broken chair leg",
+    "body": "Order ORD-1008: one chair leg snapped on arrival, it's damaged. Refund please."
+  },
+  {
+    "id": "msg_09",
+    "from": "ivy@example.com",
+    "subject": "Where is my parcel?",
+    "body": "ORD-1009 still hasn't been delivered after two weeks. I'd like a refund."
+  },
+  {
+    "id": "msg_10",
+    "from": "jack@example.com",
+    "subject": "wrong colour",
+    "body": "You sent the wrong item for ORD-1010 (red instead of black). Refund please."
+  }
+]

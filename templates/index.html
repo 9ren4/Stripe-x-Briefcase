@@ -55,6 +55,8 @@
   .actions { display: flex; gap: 8px; margin-top: 10px; }
   a { color: var(--brand); }
   textarea { width: 100%; font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; min-height: 64px; }
+  .mem { margin: 8px 0 0; padding: 8px 12px; background: #f3fbf7; border-left: 3px solid var(--ok); border-radius: 6px; font-size: 12.5px; white-space: pre-wrap; }
+  .mem b { color: var(--ok); }
   .answer { white-space: pre-wrap; font-size: 13px; line-height: 1.5; margin-top: 10px; background: #fafbff; border-radius: 8px; padding: 10px; }
   .clauses div { font-size: 12.5px; padding: 6px 0; border-bottom: 1px solid var(--line); }
   .empty { color: var(--muted); text-align: center; padding: 30px 0; }
@@ -68,6 +70,7 @@
   <h1>Refund<span>Pilot</span></h1>
   <span class="tag">STRIPE TEST MODE</span>
   <span class="tag" id="policyName"></span>
+  <span class="tag" id="cogneeTag" hidden>🧠 COGNEE MEMORY</span>
   <div class="stats">
     <div class="stat"><b id="sRefunded">£0.00</b><small>refunded</small></div>
     <div class="stat"><b id="sAwait">0</b><small>awaiting approval</small></div>
@@ -95,6 +98,7 @@
       </div>
       <div class="actions"><button class="primary" id="ask">Ask</button></div>
       <div class="answer" id="answer" hidden></div>
+      <div class="mem" id="answerMem" hidden></div>
     </div>
     <div class="panel" style="margin-top:18px">
       <h2>Written policy</h2>
@@ -119,6 +123,7 @@ async function refresh() { S = await api('/api/state'); render(); }
 
 function render() {
   document.getElementById('policyName').textContent = S.policy.name;
+  document.getElementById('cogneeTag').hidden = !S.cognee;
   document.getElementById('clauses').innerHTML = Object.entries(S.policy.clauses)
     .map(([k, v]) => `<div><span class="clause">${k}</span> ${esc(v)}</div>`).join('');
 
@@ -156,6 +161,7 @@ function caseHtml(c) {
     <div class="case-head"><span class="badge ${c.status}">${LABEL[c.status] || c.status}</span>
       <b>${esc(c.message.from)}</b><span class="clause">${d.clause}</span><span class="amt">${gbp(d.amount_pence)}</span></div>
     <div class="why"><b>Why:</b> ${esc(d.rationale)}<q>${d.clause}: “${esc(d.clause_text)}”</q></div>
+    ${c.memory ? `<div class="mem"><b>🧠 Cognee recalled customer history:</b> ${esc(c.memory.customer_history)}</div>` : ''}
     ${refund}${actions}
     <details><summary>Evidence &amp; timeline</summary>
       <table>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v ?? '—'}</td></tr>`).join('')}</table>
@@ -181,8 +187,11 @@ async function decide(kind, id, btn) {
 
 async function ask() {
   const q = document.getElementById('q').value.trim(); if (!q) return;
-  const a = document.getElementById('answer'); a.hidden = false; a.textContent = 'Checking the audit trail…';
-  a.textContent = (await api('/api/ask', {question: q})).answer;
+  const a = document.getElementById('answer'), m = document.getElementById('answerMem');
+  a.hidden = false; m.hidden = true; a.textContent = 'Recalling from memory and checking the audit trail…';
+  const r = await api('/api/ask', {question: q});
+  a.textContent = r.answer;
+  if (r.memory) { m.hidden = false; m.innerHTML = '<b>🧠 Retrieved from Cognee memory:</b>\n' + esc(r.memory); }
 }
 document.getElementById('ask').onclick = ask;
 document.querySelectorAll('[data-q]').forEach(b => b.onclick = () => { document.getElementById('q').value = b.dataset.q; ask(); });

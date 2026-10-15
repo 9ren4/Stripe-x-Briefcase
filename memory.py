@@ -1,75 +1,118 @@
-"""Agent memory: policy + every decision, so the agent can cite why it paid.
+"""Agent memory backed by Cognee: the written policy, every decision, and each customer's history.
 
-Local mode (default) keeps the audit records on disk. With USE_COGNEE=1 every decision is also written to
-Cognee's knowledge graph and questions are answered from Cognee search first.
+The agent uses it to recall a customer's past refunds before deciding, and to answer "why did you pay this?"
+from its own memory. With USE_COGNEE=0 it falls back to the local audit log.
 """
 import asyncio
 import json
 import os
 import threading
 
+from dotenv import load_dotenv
+
+load_dotenv()
 USE_COGNEE = os.environ.get("USE_COGNEE") == "1"
-DATASET = "refundpilot"
+
+# Cognee is async; run it on one dedicated event loop so Flask threads never race on its databases
+_loop = asyncio.new_event_loop()
+threading.Thread(target=_loop.run_forever, daemon=True).start()
+_write_lock = None
+
+
+def _submit(coro):
+    return asyncio.run_coroutine_threadsafe(coro, _loop)
+
+
+def dataset():
+    try:
+        batch = open(".seed_batch").read().strip()
+    except FileNotFoundError:
+        batch = "default"
+    return f"refundpilot_{batch}"
 
 
 def case_summary(case):
     d, ev, f = case.get("decision", {}), case.get("evidence", {}), case.get("facts", {})
     refund = case.get("stripe", {})
-    approvals = [e for e in case.get("events", []) if e["event"] in ("human_approved", "human_rejected")]
+    humans = [f"{e['event']} by {e.get('approver')} at {e['ts']}" for e in case.get("events", [])
+              if e["event"] in ("human_approved", "human_rejected")]
     return (
-        f"Case {case['case_id']} | status {case.get('status')} | order {ev.get('order_id')} ({ev.get('item')}) | "
-        f"requester {ev.get('requester_email')} | payer {ev.get('payment_email')} | reason {f.get('reason')} | "
-        f"paid {ev.get('amount_paid_pence')}p on {ev.get('order_date')} (age {ev.get('order_age_days')}d) | "
-        f"customer refunds in window {ev.get('customer_refunds_last_window')} | "
-        f"auto-refunded today before this {ev.get('auto_refunded_today_pence')}p | "
-        f"decision {d.get('action')} under clause {d.get('clause')}: \"{d.get('clause_text')}\" | "
-        f"rationale: {d.get('rationale')} | amount {d.get('amount_pence')}p | "
-        f"stripe refund {refund.get('refund_id')} on {ev.get('payment_intent')} | "
-        f"human actions: {json.dumps(approvals)}"
+        f"Refund case {case['case_id']} for customer {ev.get('requester_email')} (payer on file "
+        f"{ev.get('payment_email')}), order {ev.get('order_id')} ({ev.get('item')}), reason {f.get('reason')}. "
+        f"Paid {ev.get('amount_paid_pence')}p on {ev.get('order_date')} ({ev.get('order_age_days')} days old). "
+        f"Decision: {d.get('action')} for {d.get('amount_pence')}p under policy clause {d.get('clause')} "
+        f"(\"{d.get('clause_text')}\"). Rationale: {d.get('rationale')} Final status: {case.get('status')}. "
+        f"Stripe refund id: {refund.get('refund_id')} on payment {ev.get('payment_intent')}. "
+        f"Human actions: {'; '.join(humans) or 'none (agent acted autonomously)'}."
     )
 
 
-def _run(coro):
-    return asyncio.run(coro)
-
-
-def _cognee_remember(text):
+async def _remember(text):
     import cognee
-    _run(cognee.add(text, dataset_name=DATASET))
-    _run(cognee.cognify(datasets=[DATASET]))
+    global _write_lock
+    _write_lock = _write_lock or asyncio.Lock()
+    async with _write_lock:  # one graph build at a time
+        await cognee.remember(text, dataset_name=dataset(), self_improvement=False)
+
+
+async def _recall(question, include_references=False):
+    import cognee
+    results = await cognee.recall(question, datasets=[dataset()], top_k=8, include_references=include_references)
+    out = []
+    for r in results:
+        if r.source == "graph":
+            out.append(r.text)
+        elif r.source == "session":
+            out.append(r.answer)
+    return "\n".join(t for t in out if t)
+
+
+_pending = []
+
+
+def remember(text):
+    """Write to Cognee in the background; the agent never waits on a graph build."""
+    if USE_COGNEE:
+        fut = _submit(_remember(text))
+        fut.add_done_callback(lambda f: f.exception() and print("cognee remember error:", repr(f.exception())))
+        _pending.append(fut)
+
+
+def flush(timeout=600):
+    """Block until queued memory writes finish (used by seed.py)."""
+    for fut in _pending:
+        fut.result(timeout=timeout)
 
 
 def remember_case(case):
-    if USE_COGNEE:
-        # cognify is slow (LLM calls), keep it off the request path
-        threading.Thread(target=_safe, args=(_cognee_remember, case_summary(case)), daemon=True).start()
-
-
-def _safe(fn, *args):
-    try:
-        return fn(*args)
-    except Exception as e:
-        print("cognee error:", repr(e))
+    remember(case_summary(case))
 
 
 def seed_policy(policy):
-    if USE_COGNEE:
-        text = "\n".join(f"Policy {policy['name']} clause {k}: {v}" for k, v in policy["clauses"].items())
-        threading.Thread(target=_safe, args=(_cognee_remember, text), daemon=True).start()
+    """Load the written policy into Cognee once per demo batch."""
+    flag = f".cognee_policy_{dataset()}"
+    if USE_COGNEE and not os.path.exists(flag):
+        remember(f"{policy['name']}. Limits: {json.dumps(policy['params'])}. " +
+                 " ".join(f"Clause {k}: {v}" for k, v in policy["clauses"].items()))
+        open(flag, "w").close()
 
 
-def _cognee_search(question):
-    import cognee
-    from cognee import SearchType
-    results = _run(cognee.search(query_text=question, query_type=SearchType.GRAPH_COMPLETION, datasets=[DATASET]))
-    return "\n".join(str(r) for r in results)
+def recall(question, include_references=False, timeout=45):
+    """Ask Cognee memory. Returns text, or None if memory is off/empty/slow."""
+    if not USE_COGNEE:
+        return None
+    try:
+        return _submit(_recall(question, include_references)).result(timeout=timeout) or None
+    except Exception as e:
+        print("cognee recall error:", repr(e))
+        return None
 
 
-def recall(question):
+def customer_history(email):
+    return recall(f"What previous refunds or refund requests has customer {email} had? "
+                  f"List dates, amounts, orders and policy clauses. If none are known, say 'No prior history'.")
+
+
+def audit_log():
     from agent import load_cases
-    local = "\n".join(case_summary(c) for c in load_cases().values())
-    if USE_COGNEE:
-        graph = _safe(_cognee_search, question)
-        if graph:
-            return f"[Cognee memory]\n{graph}\n\n[Audit log]\n{local}"
-    return local
+    return "\n".join(case_summary(c) for c in load_cases().values())

@@ -237,6 +237,11 @@ def process(msg):
     case["evidence"] = ev
     log(case, "evidence_gathered", source="stripe")
 
+    history = memory.customer_history(msg["from"].lower())
+    if history:
+        case["memory"] = {"source": "cognee", "customer_history": history}
+        log(case, "memory_recalled", source="cognee")
+
     action, clause, amount, rationale = decide(facts, ev)
     case["decision"] = {"action": action, "clause": clause, "clause_text": CLAUSES[clause],
                         "amount_pence": amount, "rationale": rationale, "policy": POLICY["name"]}
@@ -284,7 +289,8 @@ def reject(case_id, approver):
 # ---------------------------------------------------------------- 5. explain ("Why did you pay this?")
 
 def explain(question):
-    context = memory.recall(question)
+    """Answer from Cognee memory first, cross-checked against the audit log. Returns (answer, cognee_recall)."""
+    recalled = memory.recall(question, include_references=True)
     try:
         client = anthropic.Anthropic()
         resp = client.messages.create(
@@ -293,13 +299,14 @@ def explain(question):
             output_config={"effort": "low"},
             system=(
                 "You are the audit voice of RefundPilot, a refunds agent. Answer the finance team's question using "
-                "ONLY the audit records and policy provided. For every payment you mention, cite: the case id, the "
-                "policy clause id and its wording, the evidence numbers (amounts, dates, emails), the Stripe refund id, "
-                "and who approved it (agent auto-approval or the named human). If the records don't answer the "
-                "question, say so. Be concise; use short bullet points."),
-            messages=[{"role": "user", "content": f"POLICY:\n{json.dumps(POLICY)}\n\nAUDIT RECORDS:\n{context}"
-                                                  f"\n\nQUESTION: {question}"}],
+                "ONLY the agent memory, audit records and policy provided. For every payment you mention, cite: the "
+                "case id, the policy clause id and its wording, the evidence numbers (amounts, dates, emails), the "
+                "Stripe refund id, and who approved it (agent auto-approval or the named human). If the records don't "
+                "answer the question, say so. Be concise; use short bullet points."),
+            messages=[{"role": "user", "content": f"POLICY:\n{json.dumps(POLICY)}\n\n"
+                                                  f"AGENT MEMORY (Cognee recall):\n{recalled or 'n/a'}\n\n"
+                                                  f"AUDIT RECORDS:\n{memory.audit_log()}\n\nQUESTION: {question}"}],
         )
-        return next(b.text for b in resp.content if b.type == "text")
+        return next(b.text for b in resp.content if b.type == "text"), recalled
     except Exception as e:
-        return f"(LLM unavailable: {e!r})\n\nRelevant records:\n{context}"
+        return f"(LLM unavailable: {e!r})\n\nRelevant records:\n{memory.audit_log()}", recalled

@@ -4,3 +4,5 @@ __pycache__/
 cases.json
 .seed_batch
 server.log
+.cognee_policy_*
+cognee_install.log

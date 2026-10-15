@@ -17,7 +17,8 @@ def index():
 
 @app.get("/api/state")
 def state():
-    return jsonify(inbox=INBOX, cases=agent.load_cases(), policy=agent.POLICY, batch=agent.current_batch())
+    return jsonify(inbox=INBOX, cases=agent.load_cases(), policy=agent.POLICY, batch=agent.current_batch(),
+                   cognee=memory.USE_COGNEE)
 
 
 @app.post("/api/process/<msg_id>")
@@ -38,7 +39,8 @@ def reject(case_id):
 
 @app.post("/api/ask")
 def ask():
-    return jsonify(answer=agent.explain(request.json["question"]))
+    answer, recalled = agent.explain(request.json["question"])
+    return jsonify(answer=answer, memory=recalled)
 
 
 @app.errorhandler(Exception)

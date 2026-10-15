@@ -2,6 +2,7 @@
 
 Run once before the demo:  python seed.py
 """
+import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -73,3 +74,12 @@ if __name__ == "__main__":
                           "order_id": order[0], "clause": "R1", "seeded": "true"},
             )
             print(f"          prior refund {r.id} for frank")
+
+    import memory  # imported late: it reads .seed_batch to pick this batch's Cognee dataset
+    if memory.USE_COGNEE:
+        print("loading policy + customer history into Cognee...")
+        memory.seed_policy(json.load(open("policy.json")))
+        memory.remember(f"Customer frank@example.com previously received a refund of 1200p (£12.00) on order "
+                        f"ORD-0999 (Pen set) {ORDERS[-1][3]} days ago, issued automatically under clause R1.")
+        memory.flush()
+        print("Cognee memory ready")

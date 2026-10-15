@@ -17,6 +17,7 @@ USE_COGNEE = os.environ.get("USE_COGNEE") == "1"
 _loop = asyncio.new_event_loop()
 threading.Thread(target=_loop.run_forever, daemon=True).start()
 _write_lock = None
+_sync_lock = threading.Lock()
 
 
 def _submit(coro):
@@ -84,8 +85,41 @@ def flush(timeout=600):
         fut.result(timeout=timeout)
 
 
+def _synced_file():
+    return f".cognee_synced_{dataset()}.json"
+
+
+def _mark_synced(case_id, version):
+    with _sync_lock:
+        try:
+            synced = json.load(open(_synced_file()))
+        except (FileNotFoundError, json.JSONDecodeError):
+            synced = {}
+        synced[case_id] = version
+        json.dump(synced, open(_synced_file(), "w"))
+
+
 def remember_case(case):
-    remember(case_summary(case))
+    """Queue a case for memory; it is marked synced only once Cognee confirms the write."""
+    if not USE_COGNEE:
+        return
+    version = len(case.get("events", []))
+    fut = _submit(_remember(case_summary(case)))
+    fut.add_done_callback(lambda f: print("cognee remember error:", repr(f.exception())) if f.exception()
+                          else _mark_synced(case["case_id"], version))
+    _pending.append(fut)
+
+
+def backfill(cases):
+    """Replay any decision whose memory write never completed (e.g. the server restarted mid-write)."""
+    try:
+        synced = json.load(open(_synced_file()))
+    except (FileNotFoundError, json.JSONDecodeError):
+        synced = {}
+    missing = [c for c in cases.values() if synced.get(c["case_id"]) != len(c.get("events", []))]
+    for case in missing:
+        remember_case(case)
+    return len(missing)
 
 
 def seed_policy(policy):

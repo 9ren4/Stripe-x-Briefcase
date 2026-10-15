@@ -9,6 +9,7 @@ import memory
 app = Flask(__name__)
 INBOX = json.load(open("inbox.json"))
 memory.seed_policy(agent.POLICY)
+print("cognee backfill:", memory.backfill(agent.load_cases()), "case(s) queued", flush=True)
 
 
 @app.get("/")
@@ -59,4 +60,5 @@ def on_error(e):
 
 
 if __name__ == "__main__":
-    app.run(port=5050, debug=True, threaded=True)
+    # no auto-reloader: a restart would kill in-flight Cognee memory writes
+    app.run(port=5050, threaded=True)

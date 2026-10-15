@@ -35,23 +35,34 @@ def dataset():
 def case_summary(case):
     d, ev, f = case.get("decision", {}), case.get("evidence", {}), case.get("facts", {})
     refund = case.get("stripe", {})
-    humans = [f"{e['event']} by {e.get('approver')} at {e['ts']}" for e in case.get("events", [])
-              if e["event"] in ("human_approved", "human_rejected")]
-    update = ""
-    if humans:
-        # Memory is append-only: make later records explicitly replace the earlier awaiting_approval one
-        update = (f"STATUS UPDATE for case {case['case_id']}: status changed from awaiting_approval to "
-                  f"{case.get('status')} ({humans[-1]}). This replaces the earlier awaiting_approval record "
-                  f"for {ev.get('requester_email')}. ")
-    return update + (
-        f"Refund case {case['case_id']} for customer {ev.get('requester_email')} (payer on file "
-        f"{ev.get('payment_email')}), order {ev.get('order_id')} ({ev.get('item')}), reason {f.get('reason')}. "
-        f"Paid {ev.get('amount_paid_pence')}p on {ev.get('order_date')} ({ev.get('order_age_days')} days old). "
-        f"Decision: {d.get('action')} for {d.get('amount_pence')}p under policy clause {d.get('clause')} "
-        f"(\"{d.get('clause_text')}\"). Rationale: {d.get('rationale')} Final status: {case.get('status')}. "
-        f"Stripe refund id: {refund.get('refund_id')} on payment {ev.get('payment_intent')}. "
-        f"Human actions: {'; '.join(humans) or 'none (agent acted autonomously)'}."
-    )
+    human = next((e for e in reversed(case.get("events", []))
+                  if e["event"] in ("human_approved", "human_rejected")), None)
+    who, cid = ev.get("requester_email"), case["case_id"]
+    # One short fact per line so Cognee's extractor turns each into its own node + edge
+    facts = [
+        f"Customer {who} opened refund case {cid}.",
+        f"Refund case {cid} is for order {ev.get('order_id')} ({ev.get('item')}).",
+        f"Refund case {cid} reason is {f.get('reason')}.",
+        f"Order {ev.get('order_id')} was paid {ev.get('amount_paid_pence')}p by {ev.get('payment_email')} "
+        f"on {ev.get('order_date')} via Stripe payment {ev.get('payment_intent')}.",
+        f"The agent decided {d.get('action')} for refund case {cid} under clause {d.get('clause')}.",
+        f"Clause {d.get('clause')} says: {d.get('clause_text')}",
+        f"Rationale for refund case {cid}: {d.get('rationale')}",
+    ]
+    if human:
+        verb = "approved" if human["event"] == "human_approved" else "rejected"
+        facts += [f"{human.get('approver')} {verb} refund case {cid} at {human['ts']}.",
+                  f"STATUS UPDATE: refund case {cid} changed from awaiting_approval to {case.get('status')}. "
+                  f"This replaces the earlier awaiting_approval record for {who}."]
+    elif d.get("action") == "auto_refund":
+        facts.append(f"The agent auto-refunded refund case {cid} without a human, as clause R1 allows.")
+    facts.append(f"Final status of refund case {cid} is {case.get('status')}.")
+    if refund.get("refund_id"):
+        facts.append(f"Customer {who} received Stripe refund {refund['refund_id']} of {refund.get('amount_pence')}p "
+                     f"for refund case {cid}.")
+    else:
+        facts.append(f"Customer {who} received no refund for refund case {cid}; no money moved.")
+    return "\n".join(facts)
 
 
 async def _remember(text):

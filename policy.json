@@ -1,0 +1,29 @@
+{
+  "name": "RefundPilot Refund Policy v1",
+  "currency": "gbp",
+  "params": {
+    "auto_limit_pence": 5000,
+    "approval_limit_pence": 50000,
+    "window_days": 30,
+    "max_refunds_per_customer_window": 1,
+    "daily_auto_budget_pence": 15000,
+    "allowed_reasons": [
+      "damaged",
+      "not_delivered",
+      "wrong_item",
+      "duplicate_charge"
+    ]
+  },
+  "clauses": {
+    "R1": "Refunds of £50.00 or less for an allowed reason (damaged, not delivered, wrong item, duplicate charge) on an order placed within the last 30 days may be issued automatically.",
+    "R2": "Refunds above £50.00 and up to £500.00 require approval from a human on the finance team before money moves.",
+    "R3": "Refunds above £500.00 are never issued by the agent and must be routed to the finance lead.",
+    "R4": "Orders placed more than 30 days ago are not eligible for a refund.",
+    "R5": "A customer may receive at most 1 refund in any 30-day period; further requests require human approval (fraud guard).",
+    "R6": "A refund may never exceed the amount still refundable on the original payment.",
+    "R7": "The requester's email must match the email on the original payment; otherwise the request is denied.",
+    "R8": "The agent may auto-refund at most £150.00 in total per day; requests beyond this budget require human approval.",
+    "R9": "Reasons outside the allowed list (e.g. changed mind) are denied automatically.",
+    "R10": "If no payment matching the order can be found, the request is denied and no money moves."
+  }
+}

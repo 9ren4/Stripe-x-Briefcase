@@ -20,6 +20,17 @@ email ─► Claude extracts facts ─► evidence from Stripe ─► determinis
 - **Human in the loop:** refunds above the auto limit go to an approval queue. The limits are re-checked at approval time, and the approver's identity is stamped on the Stripe refund metadata.
 - **Explains every pound:** each case records the clause, the clause wording, the evidence numbers, a timeline, the Stripe refund id and the approver. The *Ask why* box answers finance questions grounded only in that audit trail.
 
+## Cognee memory (side quest)
+
+Cognee is the agent's long-term memory (`memory.py`):
+
+1. **Policy in memory.** The written policy is loaded into a Cognee knowledge graph when the demo is seeded.
+2. **Every decision is remembered.** Each case (facts, evidence, clause, Stripe refund id, human approver) is written to Cognee in the background.
+3. **Customer history before deciding.** For each new email the agent asks Cognee *"what refunds has this customer had?"*. For example, it recalls that Frank was refunded £12 on ORD-0999 under R1, and that recall is shown on the case card as evidence.
+4. **"Why did you pay this?"** is answered from a Cognee recall with `include_references=True`, cross-checked against the audit log. The retrieved memory and its evidence chunks are shown next to the answer.
+
+Cognee runs locally with Claude Haiku 5.5 for graph extraction and fastembed embeddings (see `.env.example`).
+
 ## Demo inbox (10 emails)
 
 | Customer | Outcome | Clause |

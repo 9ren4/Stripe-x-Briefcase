@@ -2,3 +2,5 @@ stripe
 anthropic
 flask
 python-dotenv
+cognee
+fastembed

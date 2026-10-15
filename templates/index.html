@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RefundPilot</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f7fb; --panel: #fff; --ink: #0f1222; --muted: #6b7085; --line: #e6e8f0;
+    --brand: #635bff; --ok: #0e9f6e; --ok-bg: #e7f7f0; --warn: #b45309; --warn-bg: #fef3e2;
+    --bad: #c2334d; --bad-bg: #fdecef;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--ink); font-size: 14px; }
+  header { display: flex; align-items: center; gap: 16px; padding: 16px 28px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 18px; margin: 0; }
+  header h1 span { color: var(--brand); }
+  .tag { font-size: 11px; padding: 3px 8px; border-radius: 99px; background: #eef0ff; color: var(--brand); font-weight: 600; }
+  .stats { margin-left: auto; display: flex; gap: 22px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat small { color: var(--muted); }
+  main { display: grid; grid-template-columns: 320px 1fr 360px; gap: 18px; padding: 18px 28px; align-items: start; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; }
+  button { font: inherit; border: 0; border-radius: 8px; padding: 7px 12px; cursor: pointer; font-weight: 600; }
+  .primary { background: var(--brand); color: #fff; }
+  .ghost { background: #f0f1f6; color: var(--ink); }
+  .okbtn { background: var(--ok); color: #fff; }
+  .badbtn { background: var(--bad-bg); color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  .mail { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .mail .from { font-size: 12px; color: var(--muted); }
+  .mail .subj { font-weight: 600; margin: 2px 0 4px; }
+  .mail .body { font-size: 12.5px; color: #3a3f55; }
+  .mail .row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 99px; text-transform: uppercase; letter-spacing: .03em; }
+  .refunded { background: var(--ok-bg); color: var(--ok); }
+  .awaiting_approval { background: var(--warn-bg); color: var(--warn); }
+  .denied, .rejected { background: var(--bad-bg); color: var(--bad); }
+  .new { background: #f0f1f6; color: var(--muted); }
+  .case { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+  .case.awaiting_approval { border-color: #f5c27a; box-shadow: 0 0 0 3px #fef3e2; }
+  .case-head { display: flex; gap: 10px; align-items: center; }
+  .case-head .amt { margin-left: auto; font-size: 18px; font-weight: 700; }
+  .clause { background: #eef0ff; color: var(--brand); border-radius: 6px; padding: 2px 7px; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; }
+  .why { margin: 10px 0 6px; padding: 10px 12px; background: #fafbff; border-left: 3px solid var(--brand); border-radius: 6px; }
+  .why q { display: block; color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  td { padding: 3px 0; border-bottom: 1px dashed var(--line); font-size: 12.5px; }
+  td:first-child { color: var(--muted); width: 48%; }
+  .timeline { font-size: 12px; color: var(--muted); margin: 6px 0 0; padding-left: 16px; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; }
+  a { color: var(--brand); }
+  textarea { width: 100%; font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; min-height: 64px; }
+  .answer { white-space: pre-wrap; font-size: 13px; line-height: 1.5; margin-top: 10px; background: #fafbff; border-radius: 8px; padding: 10px; }
+  .clauses div { font-size: 12.5px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .empty { color: var(--muted); text-align: center; padding: 30px 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chips button { font-size: 12px; padding: 5px 9px; font-weight: 500; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Refund<span>Pilot</span></h1>
+  <span class="tag">STRIPE TEST MODE</span>
+  <span class="tag" id="policyName"></span>
+  <div class="stats">
+    <div class="stat"><b id="sRefunded">£0.00</b><small>refunded</small></div>
+    <div class="stat"><b id="sAwait">0</b><small>awaiting approval</small></div>
+    <div class="stat"><b id="sDenied">0</b><small>denied</small></div>
+  </div>
+</header>
+<main>
+  <section class="panel">
+    <h2>Support inbox <button class="primary" id="runAll">Run agent on all</button></h2>
+    <div id="inbox"></div>
+  </section>
+  <section class="panel">
+    <h2>Decisions &amp; audit trail</h2>
+    <div id="cases"><div class="empty">No cases yet. Run the agent on the inbox.</div></div>
+  </section>
+  <section>
+    <div class="panel">
+      <h2>Ask: why did you pay this?</h2>
+      <textarea id="q" placeholder="Why did you refund Alice?"></textarea>
+      <div class="chips">
+        <button class="ghost" data-q="Why did you refund Alice?">Why did you refund Alice?</button>
+        <button class="ghost" data-q="Which refunds did a human approve, and who?">Human-approved?</button>
+        <button class="ghost" data-q="Why didn't you refund Carol's laptop?">Why not Carol?</button>
+        <button class="ghost" data-q="How much did you refund today and under which clauses?">Today's total</button>
+      </div>
+      <div class="actions"><button class="primary" id="ask">Ask</button></div>
+      <div class="answer" id="answer" hidden></div>
+    </div>
+    <div class="panel" style="margin-top:18px">
+      <h2>Written policy</h2>
+      <div class="clauses" id="clauses"></div>
+    </div>
+  </section>
+</main>
+<script>
+const gbp = p => '£' + ((p || 0) / 100).toLocaleString('en-GB', {minimumFractionDigits: 2});
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LABEL = {refunded: 'Refunded', awaiting_approval: 'Needs approval', denied: 'Denied', rejected: 'Rejected', new: 'New'};
+let S = {inbox: [], cases: {}, policy: {clauses: {}}};
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (!r.ok) { alert(j.error || 'Error'); throw j; }
+  return j;
+}
+
+async function refresh() { S = await api('/api/state'); render(); }
+
+function render() {
+  document.getElementById('policyName').textContent = S.policy.name;
+  document.getElementById('clauses').innerHTML = Object.entries(S.policy.clauses)
+    .map(([k, v]) => `<div><span class="clause">${k}</span> ${esc(v)}</div>`).join('');
+
+  document.getElementById('inbox').innerHTML = S.inbox.map(m => {
+    const c = S.cases['case_' + m.id]; const st = c ? c.status : 'new';
+    return `<div class="mail"><div class="from">${esc(m.from)}</div><div class="subj">${esc(m.subject)}</div>
+      <div class="body">${esc(m.body)}</div>
+      <div class="row"><span class="badge ${st}">${LABEL[st] || st}</span>
+      ${c ? '' : `<button class="ghost" onclick="run('${m.id}', this)">Run agent</button>`}</div></div>`;
+  }).join('');
+
+  const cases = Object.values(S.cases).sort((a, b) => (a.status === 'awaiting_approval' ? -1 : 0) - (b.status === 'awaiting_approval' ? -1 : 0) || b.created.localeCompare(a.created));
+  document.getElementById('cases').innerHTML = cases.length ? cases.map(caseHtml).join('') : '<div class="empty">No cases yet. Run the agent on the inbox.</div>';
+
+  document.getElementById('sRefunded').textContent = gbp(cases.reduce((t, c) => t + (c.stripe?.amount_pence || 0), 0));
+  document.getElementById('sAwait').textContent = cases.filter(c => c.status === 'awaiting_approval').length;
+  document.getElementById('sDenied').textContent = cases.filter(c => ['denied', 'rejected'].includes(c.status)).length;
+}
+
+function caseHtml(c) {
+  const d = c.decision || {}, ev = c.evidence || {}, f = c.facts || {};
+  const rows = [
+    ['Order', `${ev.order_id || '—'} · ${ev.item || ''}`], ['Reason (extracted)', f.reason],
+    ['Requester / payer', `${ev.requester_email} / ${ev.payment_email || '—'}`],
+    ['Paid', ev.payment_found ? `${gbp(ev.amount_paid_pence)} on ${ev.order_date} (${ev.order_age_days} days ago)` : 'no payment found'],
+    ['Already refunded', gbp(ev.already_refunded_pence)], ['Customer refunds (30d)', ev.customer_refunds_last_window],
+    ['Auto-refunded today (before)', gbp(ev.auto_refunded_today_pence)],
+    ['PaymentIntent', ev.payment_intent ? `<span class="mono">${ev.payment_intent}</span>` : '—'],
+  ];
+  const refund = c.stripe ? `<div style="margin-top:8px">💸 Stripe refund <span class="mono">${c.stripe.refund_id}</span> · ${c.stripe.status} · <a href="${c.stripe.dashboard}" target="_blank">open in Stripe ↗</a></div>` : '';
+  const actions = c.status === 'awaiting_approval' ? `<div class="actions">
+      <button class="okbtn" onclick="decide('approve','${c.case_id}',this)">Approve ${gbp(d.amount_pence)}</button>
+      <button class="badbtn" onclick="decide('reject','${c.case_id}',this)">Reject</button></div>` : '';
+  return `<div class="case ${c.status}">
+    <div class="case-head"><span class="badge ${c.status}">${LABEL[c.status] || c.status}</span>
+      <b>${esc(c.message.from)}</b><span class="clause">${d.clause}</span><span class="amt">${gbp(d.amount_pence)}</span></div>
+    <div class="why"><b>Why:</b> ${esc(d.rationale)}<q>${d.clause}: “${esc(d.clause_text)}”</q></div>
+    ${refund}${actions}
+    <details><summary>Evidence &amp; timeline</summary>
+      <table>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v ?? '—'}</td></tr>`).join('')}</table>
+      <ul class="timeline">${(c.events || []).map(e => `<li><span class="mono">${e.ts.slice(11, 19)}</span> ${e.event}${e.approver ? ' by ' + esc(e.approver) : ''}${e.refund_id ? ' → ' + e.refund_id : ''}${e.by ? ' (' + e.by + ')' : ''}</li>`).join('')}</ul>
+    </details></div>`;
+}
+
+async function run(id, btn) { if (btn) { btn.disabled = true; btn.textContent = 'Thinking…'; } await api('/api/process/' + id, {}); await refresh(); }
+
+document.getElementById('runAll').onclick = async e => {
+  e.target.disabled = true;
+  for (const m of S.inbox) if (!S.cases['case_' + m.id]) await run(m.id, null);
+  e.target.disabled = false;
+};
+
+async function decide(kind, id, btn) {
+  const approver = kind === 'approve' ? prompt('Approver email', 'finance.lead@company.com') : 'finance.lead@company.com';
+  if (!approver) return;
+  btn.disabled = true;
+  await api(`/api/${kind}/${id}`, {approver});
+  await refresh();
+}
+
+async function ask() {
+  const q = document.getElementById('q').value.trim(); if (!q) return;
+  const a = document.getElementById('answer'); a.hidden = false; a.textContent = 'Checking the audit trail…';
+  a.textContent = (await api('/api/ask', {question: q})).answer;
+}
+document.getElementById('ask').onclick = ask;
+document.querySelectorAll('[data-q]').forEach(b => b.onclick = () => { document.getElementById('q').value = b.dataset.q; ask(); });
+
+refresh();
+</script>
+</body>
+</html>

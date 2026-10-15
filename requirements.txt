@@ -1,0 +1,4 @@
+stripe
+anthropic
+flask
+python-dotenv
